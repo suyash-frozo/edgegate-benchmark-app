@@ -1,0 +1,34 @@
+# Build outputs
+build/
+app/build/
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# Local config
+local.properties
+
+# Native build
+.cxx/
+*.so
+*.o
+
+# llama.cpp submodule — clone separately
+app/src/main/cpp/llama.cpp/
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# APK/AAB
+*.apk
+*.aab
+
+# Signing
+*.jks
+*.keystore
+
+# ONNX model assets (large files — download separately)
+# app/src/main/assets/*.onnx

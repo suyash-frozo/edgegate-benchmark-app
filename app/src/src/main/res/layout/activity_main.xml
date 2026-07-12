@@ -1,0 +1,280 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#101922">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <!-- Header -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="EdgeGate Benchmark"
+            android:textColor="#FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="On-device AI model testing"
+            android:textColor="#92adc9"
+            android:textSize="14sp"
+            android:layout_marginBottom="20dp" />
+
+        <!-- Device Info Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DEVICE"
+                android:textColor="#92adc9"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tvDeviceInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Detecting..."
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+
+        <!-- EdgeGate Connection Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="EDGEGATE SERVER"
+                android:textColor="#92adc9"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etServerUrl"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:hint="https://edgegateapi.frozo.ai"
+                android:text="https://edgegateapi.frozo.ai"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#56697d"
+                android:textSize="13sp"
+                android:background="@drawable/input_bg"
+                android:padding="12dp"
+                android:inputType="textUri"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etApiKey"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:hint="API Key or JWT Token"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#56697d"
+                android:textSize="13sp"
+                android:background="@drawable/input_bg"
+                android:padding="12dp"
+                android:inputType="textPassword"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etWorkspaceId"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:hint="Workspace ID"
+                android:text="7479eff9-985a-49c0-b3a0-5e5b3885a5a7"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#56697d"
+                android:textSize="13sp"
+                android:background="@drawable/input_bg"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnConnect"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Connect &amp; Fetch Models"
+                android:backgroundTint="#2b8cee"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textAllCaps="false" />
+        </LinearLayout>
+
+        <!-- Model Selection Card -->
+        <LinearLayout
+            android:id="@+id/cardModels"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="MODEL"
+                android:textColor="#92adc9"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/spinnerModels"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/input_bg"
+                android:padding="8dp"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DELEGATES"
+                android:textColor="#92adc9"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
+
+                <CheckBox
+                    android:id="@+id/cbCpu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="CPU"
+                    android:textColor="#FFFFFF"
+                    android:checked="true"
+                    android:buttonTint="#2b8cee"
+                    android:layout_marginEnd="16dp" />
+
+                <CheckBox
+                    android:id="@+id/cbGpu"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="GPU"
+                    android:textColor="#FFFFFF"
+                    android:checked="true"
+                    android:buttonTint="#2b8cee"
+                    android:layout_marginEnd="16dp" />
+
+                <CheckBox
+                    android:id="@+id/cbNnapi"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="NNAPI (NPU)"
+                    android:textColor="#FFFFFF"
+                    android:checked="true"
+                    android:buttonTint="#2b8cee" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnBenchmark"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="Run Benchmark"
+                android:backgroundTint="#10b981"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textAllCaps="false" />
+        </LinearLayout>
+
+        <!-- Progress -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:indeterminateTint="#2b8cee"
+            android:visibility="gone"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:id="@+id/tvStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#92adc9"
+            android:textSize="13sp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone" />
+
+        <!-- Results Card -->
+        <LinearLayout
+            android:id="@+id/cardResults"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="BENCHMARK RESULTS"
+                android:textColor="#92adc9"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:id="@+id/tvResults"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:fontFamily="monospace"
+                android:lineSpacingExtra="4dp" />
+        </LinearLayout>
+
+        <!-- Report Button -->
+        <Button
+            android:id="@+id/btnReport"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="Report to EdgeGate"
+            android:backgroundTint="#2b8cee"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textAllCaps="false"
+            android:visibility="gone"
+            android:layout_marginBottom="20dp" />
+
+    </LinearLayout>
+</ScrollView>

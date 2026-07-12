@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.EdgeGate" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#2b8cee</item>
+        <item name="colorPrimaryDark">#101922</item>
+        <item name="colorAccent">#25e2f4</item>
+        <item name="android:statusBarColor">#101922</item>
+        <item name="android:navigationBarColor">#101922</item>
+        <item name="android:windowBackground">#101922</item>
+    </style>
+</resources>
