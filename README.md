@@ -11,6 +11,18 @@ Supports **4 runtimes** — test any model format on any Snapdragon/ARM device:
 | **llama.cpp** | `.gguf` | CPU (with ARM NEON) |
 | **GenieX** | GenieX catalog | NPU, GPU, CPU, Hybrid |
 
+## Screenshots
+
+GenieX (Snapdragon NPU) and EdgeGate's universal **llama.cpp** path running the **same model, side by side** on a real device:
+
+<p align="center">
+  <img src="docs/screenshots/geniex-card.png" width="31%" alt="GenieX on-device LLM card — download, load/unload, NPU/GPU/CPU" />
+  <img src="docs/screenshots/geniex-vs-universal.png" width="31%" alt="GenieX vs Universal llama.cpp results, same model" />
+  <img src="docs/screenshots/benchmark-results.png" width="31%" alt="Benchmark metrics: TTFT, tokens/sec, memory" />
+</p>
+
+*Left: the GenieX card — pick a model, download, load/unload from RAM, pick a compute unit. Middle & right: the same Qwen3-0.6B benchmarked through **GenieX** and **llama.cpp**. GenieX taps the Snapdragon NPU (Qualcomm-only); the llama.cpp path runs the same model on **Snapdragon, MediaTek, Exynos, and any ARM device** — which is what EdgeGate exists to compare.*
+
 ## What it measures
 
 - **Inference time** (median, P50, P95, P99)
