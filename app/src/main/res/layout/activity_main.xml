@@ -2,7 +2,7 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#101922">
+    android:background="#f4f6f9">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -15,7 +15,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="EdgeGate Benchmark"
-            android:textColor="#FFFFFF"
+            android:textColor="#0f1a24"
             android:textSize="28sp"
             android:textStyle="bold"
             android:layout_marginBottom="4dp" />
@@ -24,7 +24,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="On-device AI model testing"
-            android:textColor="#92adc9"
+            android:textColor="#56697d"
             android:textSize="14sp"
             android:layout_marginBottom="20dp" />
 
@@ -41,7 +41,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="DEVICE"
-                android:textColor="#92adc9"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -52,7 +52,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Detecting..."
-                android:textColor="#FFFFFF"
+                android:textColor="#0f1a24"
                 android:textSize="14sp"
                 android:lineSpacingExtra="4dp" />
         </LinearLayout>
@@ -79,7 +79,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="DEVICE PROFILE"
-                    android:textColor="#92adc9"
+                    android:textColor="#56697d"
                     android:textSize="11sp"
                     android:textStyle="bold"
                     android:letterSpacing="0.1" />
@@ -101,7 +101,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="Analyzing device..."
-                android:textColor="#FFFFFF"
+                android:textColor="#0f1a24"
                 android:textSize="13sp"
                 android:maxLines="3"
                 android:ellipsize="end"
@@ -112,11 +112,39 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text=""
-                android:textColor="#FFFFFF"
+                android:textColor="#0f1a24"
                 android:textSize="12sp"
                 android:fontFamily="monospace"
                 android:lineSpacingExtra="3dp"
                 android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/tvSystemRam"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="RAM: — GB free / — GB total"
+                android:textColor="#0f1a24"
+                android:textSize="13sp"
+                android:layout_marginTop="10dp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnFreeRam"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Free RAM"
+                android:backgroundTint="#e2e8f0"
+                android:textColor="#0f1a24"
+                android:textSize="13sp"
+                android:textAllCaps="false"
+                android:layout_marginBottom="6dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Android can't close other apps — close them manually for full capacity."
+                android:textColor="#94a3b8"
+                android:textSize="11sp" />
         </LinearLayout>
 
         <!-- EdgeGate Connection Card -->
@@ -132,7 +160,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="EDGEGATE SERVER"
-                android:textColor="#92adc9"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -144,8 +172,8 @@
                 android:layout_height="48dp"
                 android:hint="https://edgegateapi.frozo.ai"
                 android:text="https://edgegateapi.frozo.ai"
-                android:textColor="#FFFFFF"
-                android:textColorHint="#56697d"
+                android:textColor="#0f1a24"
+                android:textColorHint="#94a3b8"
                 android:textSize="13sp"
                 android:background="@drawable/input_bg"
                 android:padding="12dp"
@@ -157,8 +185,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:hint="API Key or JWT Token"
-                android:textColor="#FFFFFF"
-                android:textColorHint="#56697d"
+                android:textColor="#0f1a24"
+                android:textColorHint="#94a3b8"
                 android:textSize="13sp"
                 android:background="@drawable/input_bg"
                 android:padding="12dp"
@@ -171,8 +199,8 @@
                 android:layout_height="48dp"
                 android:hint="Workspace ID"
                 android:text="7479eff9-985a-49c0-b3a0-5e5b3885a5a7"
-                android:textColor="#FFFFFF"
-                android:textColorHint="#56697d"
+                android:textColor="#0f1a24"
+                android:textColorHint="#94a3b8"
                 android:textSize="13sp"
                 android:background="@drawable/input_bg"
                 android:padding="12dp"
@@ -203,12 +231,20 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="MODEL"
-                android:textColor="#92adc9"
+                android:text="ML MODEL BENCHMARK · TFLITE / ONNX"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
-                android:layout_marginBottom="8dp" />
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Benchmarks a NON-LLM model (vision, audio, classifier) across CPU, GPU and NNAPI(NPU) — measuring inference latency per delegate, not tokens/sec. Expects a .tflite or .onnx file: pick one fetched from your EdgeGate server below, or load one from the device."
+                android:textColor="#94a3b8"
+                android:textSize="11sp"
+                android:layout_marginBottom="10dp" />
 
             <Spinner
                 android:id="@+id/spinnerModels"
@@ -222,7 +258,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="OR LOAD FROM DEVICE"
-                android:textColor="#56697d"
+                android:textColor="#94a3b8"
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -234,8 +270,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:text="Pick .tflite / .onnx from device"
-                android:backgroundTint="#334155"
-                android:textColor="#92adc9"
+                android:backgroundTint="#e2e8f0"
+                android:textColor="#56697d"
                 android:textSize="13sp"
                 android:textAllCaps="false"
                 android:layout_marginBottom="4dp" />
@@ -244,7 +280,7 @@
                 android:id="@+id/tvSelectedFile"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#25e2f4"
+                android:textColor="#0e7490"
                 android:textSize="12sp"
                 android:fontFamily="monospace"
                 android:visibility="gone"
@@ -254,7 +290,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="DELEGATES"
-                android:textColor="#92adc9"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -271,7 +307,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="CPU"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#0f1a24"
                     android:checked="true"
                     android:buttonTint="#2b8cee"
                     android:layout_marginEnd="16dp" />
@@ -281,7 +317,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="GPU"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#0f1a24"
                     android:checked="true"
                     android:buttonTint="#2b8cee"
                     android:layout_marginEnd="16dp" />
@@ -291,7 +327,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="NNAPI (NPU)"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#0f1a24"
                     android:checked="true"
                     android:buttonTint="#2b8cee" />
             </LinearLayout>
@@ -301,7 +337,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="QUALITY GATES"
-                android:textColor="#92adc9"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -319,7 +355,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Preset:"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#0f1a24"
                     android:textSize="13sp"
                     android:gravity="center_vertical"
                     android:layout_gravity="center_vertical" />
@@ -361,8 +397,8 @@
                         android:layout_height="36dp"
                         android:layout_weight="1"
                         android:text="+ Add Gate"
-                        android:backgroundTint="#334155"
-                        android:textColor="#25e2f4"
+                        android:backgroundTint="#e2e8f0"
+                        android:textColor="#0e7490"
                         android:textSize="12sp"
                         android:textAllCaps="false"
                         android:layout_marginEnd="8dp" />
@@ -373,7 +409,7 @@
                         android:layout_height="36dp"
                         android:layout_weight="1"
                         android:text="- Remove Gate"
-                        android:backgroundTint="#334155"
+                        android:backgroundTint="#e2e8f0"
                         android:textColor="#ef4444"
                         android:textSize="12sp"
                         android:textAllCaps="false" />
@@ -405,20 +441,46 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="LLM BENCHMARK"
-                android:textColor="#92adc9"
+                android:text="UNIVERSAL LLM · llama.cpp"
+                android:textColor="#56697d"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cross-platform CPU/GPU path — works on any phone (MediaTek, Exynos, etc.). Use this when the chip has no vendor NPU SDK."
+                android:textColor="#94a3b8"
+                android:textSize="11sp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="DOWNLOADED (GenieX GGUF)"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
                 android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/spinnerLlmDownloaded"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/input_bg"
+                android:padding="8dp"
+                android:layout_marginBottom="10dp" />
 
             <Button
                 android:id="@+id/btnPickGguf"
                 android:layout_width="match_parent"
                 android:layout_height="44dp"
                 android:text="Pick .gguf model from device"
-                android:backgroundTint="#334155"
-                android:textColor="#92adc9"
+                android:backgroundTint="#e2e8f0"
+                android:textColor="#56697d"
                 android:textSize="13sp"
                 android:textAllCaps="false"
                 android:layout_marginBottom="4dp" />
@@ -427,7 +489,7 @@
                 android:id="@+id/tvSelectedGguf"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#25e2f4"
+                android:textColor="#0e7490"
                 android:textSize="12sp"
                 android:fontFamily="monospace"
                 android:visibility="gone"
@@ -439,8 +501,8 @@
                 android:layout_height="wrap_content"
                 android:hint="Test prompt..."
                 android:text="Explain edge AI in one sentence."
-                android:textColor="#FFFFFF"
-                android:textColorHint="#56697d"
+                android:textColor="#0f1a24"
+                android:textColorHint="#94a3b8"
                 android:textSize="13sp"
                 android:background="@drawable/input_bg"
                 android:padding="12dp"
@@ -458,7 +520,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Max tokens: "
-                    android:textColor="#92adc9"
+                    android:textColor="#56697d"
                     android:textSize="13sp" />
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -466,7 +528,7 @@
                     android:layout_width="80dp"
                     android:layout_height="36dp"
                     android:text="64"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#0f1a24"
                     android:textSize="13sp"
                     android:background="@drawable/input_bg"
                     android:padding="8dp"
@@ -476,7 +538,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="  Threads: "
-                    android:textColor="#92adc9"
+                    android:textColor="#56697d"
                     android:textSize="13sp" />
 
                 <com.google.android.material.textfield.TextInputEditText
@@ -484,7 +546,7 @@
                     android:layout_width="60dp"
                     android:layout_height="36dp"
                     android:text="4"
-                    android:textColor="#FFFFFF"
+                    android:textColor="#0f1a24"
                     android:textSize="13sp"
                     android:background="@drawable/input_bg"
                     android:padding="8dp"
@@ -500,7 +562,233 @@
                 android:textColor="#FFFFFF"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:textAllCaps="false" />
+                android:textAllCaps="false"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="4dp">
+
+                <Button
+                    android:id="@+id/btnLlmLoad"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="44dp"
+                    android:text="Load Model"
+                    android:backgroundTint="#e2e8f0"
+                    android:textColor="#0f1a24"
+                    android:textSize="12sp"
+                    android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:paddingHorizontal="2dp"
+                    android:layout_marginEnd="6dp" />
+
+                <Button
+                    android:id="@+id/btnLlmUnload"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="44dp"
+                    android:text="Free RAM"
+                    android:backgroundTint="#e2e8f0"
+                    android:textColor="#ef4444"
+                    android:textSize="12sp"
+                    android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:paddingHorizontal="2dp"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvLlmLoadStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Not loaded"
+                android:textColor="#94a3b8"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- GenieX On-Device LLM Card -->
+        <LinearLayout
+            android:id="@+id/cardGenieX"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:padding="16dp"
+            android:layout_marginBottom="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="GENIEX ON-DEVICE LLM · SNAPDRAGON NPU"
+                android:textColor="#56697d"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Qualcomm Snapdragon only — runs on the Hexagon NPU. Pick a model below, download it, then benchmark."
+                android:textColor="#94a3b8"
+                android:textSize="11sp"
+                android:layout_marginBottom="10dp" />
+
+            <Spinner
+                android:id="@+id/spinnerGenieXModels"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/input_bg"
+                android:padding="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/tvGenieXModelStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Not downloaded"
+                android:textColor="#56697d"
+                android:textSize="12sp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnGenieXDownload"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:text="Download Model"
+                android:backgroundTint="#2b8cee"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textAllCaps="false"
+                android:layout_marginBottom="8dp" />
+
+            <ProgressBar
+                android:id="@+id/pbGenieXDownload"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:progressTint="#2b8cee"
+                android:visibility="gone"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/tvGenieXDownloadStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#56697d"
+                android:textSize="12sp"
+                android:visibility="gone"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="COMPUTE UNIT"
+                android:textColor="#56697d"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:layout_marginBottom="8dp" />
+
+            <Spinner
+                android:id="@+id/spinnerGenieXComputeUnit"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:background="@drawable/input_bg"
+                android:padding="8dp"
+                android:layout_marginBottom="12dp" />
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etGenieXPrompt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Benchmark prompt..."
+                android:text="Explain edge AI in one sentence."
+                android:textColor="#0f1a24"
+                android:textColorHint="#94a3b8"
+                android:textSize="13sp"
+                android:background="@drawable/input_bg"
+                android:padding="12dp"
+                android:minLines="2"
+                android:gravity="top"
+                android:layout_marginBottom="12dp" />
+
+            <Button
+                android:id="@+id/btnRunGenieX"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="Run GenieX Benchmark"
+                android:backgroundTint="#8b5cf6"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                android:layout_marginBottom="8dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="4dp">
+
+                <Button
+                    android:id="@+id/btnGenieXLoad"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="44dp"
+                    android:text="Load Model"
+                    android:backgroundTint="#e2e8f0"
+                    android:textColor="#0f1a24"
+                    android:textSize="12sp"
+                    android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:paddingHorizontal="2dp"
+                    android:layout_marginEnd="6dp" />
+
+                <Button
+                    android:id="@+id/btnGenieXUnload"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="44dp"
+                    android:text="Free RAM"
+                    android:backgroundTint="#e2e8f0"
+                    android:textColor="#ef4444"
+                    android:textSize="12sp"
+                    android:textAllCaps="false"
+                    android:maxLines="1"
+                    android:insetLeft="0dp"
+                    android:insetRight="0dp"
+                    android:paddingHorizontal="2dp"
+                    android:layout_marginStart="6dp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvGenieXLoadStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Not loaded"
+                android:textColor="#94a3b8"
+                android:textSize="11sp"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:id="@+id/tvGenieXResults"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textColor="#0f1a24"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:lineSpacingExtra="3dp" />
         </LinearLayout>
 
         <!-- LLM Results Card -->
@@ -518,7 +806,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="LLM RESULTS"
-                android:textColor="#92adc9"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -528,7 +816,7 @@
                 android:id="@+id/tvLlmResults"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#FFFFFF"
+                android:textColor="#0f1a24"
                 android:textSize="12sp"
                 android:fontFamily="monospace"
                 android:lineSpacingExtra="3dp" />
@@ -547,7 +835,7 @@
             android:id="@+id/tvStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#92adc9"
+            android:textColor="#56697d"
             android:textSize="13sp"
             android:layout_marginBottom="12dp"
             android:visibility="gone" />
@@ -567,7 +855,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="BENCHMARK RESULTS"
-                android:textColor="#92adc9"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -577,7 +865,7 @@
                 android:id="@+id/tvResults"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#FFFFFF"
+                android:textColor="#0f1a24"
                 android:textSize="13sp"
                 android:fontFamily="monospace"
                 android:lineSpacingExtra="4dp" />
@@ -598,7 +886,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="QUALITY GATE RESULTS"
-                android:textColor="#92adc9"
+                android:textColor="#56697d"
                 android:textSize="11sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1"
@@ -608,7 +896,7 @@
                 android:id="@+id/tvGateResults"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="#FFFFFF"
+                android:textColor="#0f1a24"
                 android:textSize="13sp"
                 android:fontFamily="monospace"
                 android:lineSpacingExtra="4dp" />

@@ -4,9 +4,12 @@ import android.content.Context
 import android.os.Debug
 import android.util.Log
 import com.geniex.sdk.LlmWrapper
+import com.geniex.sdk.ModelManagerWrapper
 import com.geniex.sdk.bean.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.Locale
 
 /**
@@ -24,13 +27,39 @@ class GenieXBenchmark(private val context: Context) {
         /** Available compute units. */
         val COMPUTE_UNITS = listOf("npu", "gpu", "cpu", "hybrid")
 
-        /** Popular models users can pick from. */
+        /**
+         * Models the user can pick from for the Snapdragon (GenieX) path.
+         *
+         * The GenieX SDK has no "list available models" API, so this list is curated
+         * here. Per Qualcomm's GenieX docs, each `modelId` is NOT a short alias — it is
+         * one of two resolvable forms passed to pullFlow (HubSource.AUTO):
+         *   • "ai-hub-models/<Name>"  → Qualcomm AI Hub pre-compiled bundle, runs on the
+         *                                Hexagon NPU (best perf). Confirmed: ai-hub-models/Qwen3-4B.
+         *   • "<org>/<repo>-GGUF"     → a HuggingFace GGUF repo, run via llama.cpp on
+         *                                CPU/GPU/NPU. Use a Q4_0 quant for NPU support.
+         * If a download fails with "model not found", that exact id/repo isn't published
+         * on the hub — check https://aihub.qualcomm.com/models and huggingface.co.
+         */
         val MODEL_CATALOG = listOf(
-            ModelEntry("Qwen3-0.6B", "qwen3-0.6b", "0.6B params, fast, good for testing"),
-            ModelEntry("Qwen3-1.7B", "qwen3-1.7b", "1.7B params, balanced speed/quality"),
-            ModelEntry("Llama-3.2-3B", "llama-3.2-3b-instruct", "3B params, needs 8GB+ RAM"),
-            ModelEntry("Phi-4-Mini", "phi-4-mini-instruct", "3.8B params, strong reasoning"),
-            ModelEntry("Gemma-4-2B", "gemma-4-e2b-it", "2B params, Google's efficient model"),
+            // — GGUF via llama.cpp — these download & run on ANY Snapdragon (default) —
+            // — Qwen GGUF (official Qwen HF repos) —
+            ModelEntry("Qwen3-0.6B", "Qwen/Qwen3-0.6B-GGUF", "0.6B params, fastest, good for testing"),
+            ModelEntry("Qwen3-1.7B", "Qwen/Qwen3-1.7B-GGUF", "1.7B params, balanced speed/quality"),
+            ModelEntry("Qwen3-4B (GGUF)", "Qwen/Qwen3-4B-GGUF", "4B params, higher quality"),
+            // — Llama GGUF (unsloth HF repos) —
+            ModelEntry("Llama-3.2-1B", "unsloth/Llama-3.2-1B-Instruct-GGUF", "1B params, very fast"),
+            ModelEntry("Llama-3.2-3B", "unsloth/Llama-3.2-3B-Instruct-GGUF", "3B params, needs 8GB+ RAM"),
+            // — Microsoft Phi GGUF — confirmed in GenieX docs —
+            ModelEntry("Phi-4-Mini", "unsloth/Phi-4-mini-instruct-GGUF", "3.8B params, strong reasoning"),
+            // — Google Gemma (Qualcomm HF repo) — confirmed on huggingface.co/qualcomm —
+            ModelEntry("Gemma-4-E2B", "qualcomm/Gemma-4-E2B-it", "2B params, Google's efficient model"),
+            ModelEntry("Gemma-2-2B", "unsloth/gemma-2-2b-it-GGUF", "2B params, older Gemma"),
+            // — Mistral GGUF —
+            ModelEntry("Mistral-7B", "bartowski/Mistral-7B-Instruct-v0.3-GGUF", "7B params, flagship-class, needs 12GB+ RAM"),
+            // — NPU pre-compiled (Qualcomm AI Hub) — Snapdragon 8 Elite ONLY.
+            //   The hub has no NPU build for mid-tier chips (e.g. SM7550), so this
+            //   download returns rc=-100010 "not found on hub" on those devices.
+            ModelEntry("Qwen3-4B (NPU · 8 Elite only)", "ai-hub-models/Qwen3-4B", "NPU pre-compiled — only downloads on Snapdragon 8 Elite / Elite Gen 5"),
         )
     }
 
@@ -68,53 +97,111 @@ class GenieXBenchmark(private val context: Context) {
         fun onToken(token: String)
     }
 
+    // ---- Model residency: load / unload from RAM ----
+    // A GenieX LlmWrapper pins the model in native memory until close() is called.
+    // We keep the wrapper resident so it can be reused across runs, and free it on
+    // demand so RAM drops after testing.
+    private var loadedLlm: LlmWrapper? = null
+    private var loadedKey: String? = null   // "modelId|computeUnit" of the resident model
+
+    /** True if a model is currently held in RAM. */
+    fun isLoaded(): Boolean = loadedLlm != null
+
+    /** Display name of the resident model, or null if nothing is loaded. */
+    fun loadedModelName(): String? {
+        val id = loadedKey?.substringBefore('|') ?: return null
+        return MODEL_CATALOG.find { it.modelId == id }?.displayName ?: id
+    }
+
+    /** Free the resident model's native memory. Safe to call when nothing is loaded. */
+    fun unload() {
+        try { loadedLlm?.close() } catch (_: Exception) {}
+        loadedLlm = null
+        loadedKey = null
+    }
+
+    /** Absolute process RSS in MB (reads /proc) — identical to LlmBenchmark's measurement. */
+    private fun getRssMemoryMb(): Float {
+        try {
+            val status = File("/proc/self/status").readText()
+            val match = Regex("VmRSS:\\s+(\\d+)\\s+kB").find(status)
+            if (match != null) return match.groupValues[1].toFloat() / 1024f
+        } catch (_: Exception) {}
+        val rt = Runtime.getRuntime()
+        return (rt.totalMemory() - rt.freeMemory()) / (1024f * 1024f)
+    }
+
+    /**
+     * Load a model into RAM (without generating), or reuse it if already resident.
+     * Loading a different model/compute-unit frees the previous one first.
+     * Returns null on success, or a human-readable error message on failure.
+     */
+    suspend fun load(modelId: String, computeUnit: String, threads: Int = 4): String? = withContext(Dispatchers.IO) {
+        val key = "$modelId|$computeUnit|$threads"
+        if (loadedLlm != null && loadedKey == key) return@withContext null
+        unload()  // free any other model before loading a new one
+
+        // The native loader SIGSEGVs on a bad path, so the model must be downloaded
+        // and we must pass its real on-disk paths (not the id).
+        if (modelId !in ModelManagerWrapper.list()) {
+            return@withContext "Model not downloaded. Tap \"Download Model\" first, then run."
+        }
+        val paths = ModelManagerWrapper.getPaths(modelId)
+        val modelPath = paths?.model_path
+        if (paths == null || modelPath.isNullOrEmpty() || !File(modelPath).exists()) {
+            return@withContext "Model files missing on disk. Re-download the model."
+        }
+        val createInput = LlmCreateInput(
+            model_name = modelId,
+            model_path = modelPath,
+            tokenizer_path = paths.tokenizer_path,
+            config = ModelConfig(nCtx = 1024, nThreads = threads, nThreadsBatch = threads, nGpuLayers = if (computeUnit == "gpu") 999 else 0),
+            runtime_id = paths.runtime_id,
+            compute_unit = computeUnit,
+        )
+        val buildResult = LlmWrapper.builder().llmCreateInput(createInput).build()
+        if (buildResult.isFailure) {
+            return@withContext buildResult.exceptionOrNull()?.message ?: "Failed to load model"
+        }
+        loadedLlm = buildResult.getOrThrow()
+        loadedKey = key
+        null
+    }
+
     /**
      * Benchmark a single model on a specific compute unit.
      */
     suspend fun benchmark(
         modelId: String,
         computeUnit: String,
-        prompt: String = "Explain what edge AI is in one sentence.",
-        maxTokens: Int = 128,
+        prompt: String = "Explain edge AI in one sentence.",
+        maxTokens: Int = 64,
+        threads: Int = 4,
         callback: ProgressCallback? = null,
     ): GenieXResult = withContext(Dispatchers.IO) {
         val modelName = MODEL_CATALOG.find { it.modelId == modelId }?.displayName ?: modelId
 
         callback?.onProgress("Loading $modelName on ${computeUnit.uppercase()}...")
 
-        val memBefore = Debug.getNativeHeapAllocatedSize()
         val loadStart = System.currentTimeMillis()
 
-        var llm: LlmWrapper? = null
         try {
-            val createInput = LlmCreateInput(
-                model_name = modelId,
-                model_path = modelId,  // GenieX resolves from cache
-                config = ModelConfig(
-                    nCtx = 1024,
-                    nGpuLayers = if (computeUnit == "gpu") 999 else 0,
-                ),
-                compute_unit = computeUnit,
-            )
-
-            val buildResult = LlmWrapper.builder()
-                .llmCreateInput(createInput)
-                .build()
-
-            if (buildResult.isFailure) {
+            // Load into RAM (or reuse the already-resident model). This resolves the
+            // real on-disk paths and guards against the native SIGSEGV; the model stays
+            // resident afterwards and is freed only via unload().
+            val loadError = load(modelId, computeUnit, threads)
+            if (loadError != null) {
                 return@withContext GenieXResult(
-                    modelName = modelName,
-                    computeUnit = computeUnit,
+                    modelName = modelName, computeUnit = computeUnit,
                     ttftMs = 0.0, prefillSpeed = 0.0, decodeSpeed = 0.0,
                     promptTokens = 0, generatedTokens = 0,
                     peakMemoryMb = 0.0, loadTimeMs = 0,
                     generatedText = "",
                     success = false,
-                    error = buildResult.exceptionOrNull()?.message ?: "Failed to load model",
+                    error = loadError,
                 )
             }
-
-            llm = buildResult.getOrThrow()
+            val llm = loadedLlm!!
             val loadTimeMs = System.currentTimeMillis() - loadStart
 
             callback?.onProgress("Generating on ${computeUnit.uppercase()}...")
@@ -143,42 +230,57 @@ class GenieXBenchmark(private val context: Context) {
                 )
             }
 
-            val formattedPrompt = templateResult.getOrThrow().formattedPrompt
+            val formattedPrompt = templateResult.getOrThrow().formattedText
 
-            // Generate with streaming
+            // Generate via streaming — GenieX exposes generation as a Flow<LlmStreamResult>.
+            // Temperature lives on SamplerConfig; token budget is GenerationConfig.maxTokens.
             val sb = StringBuilder()
-            val genConfig = GenerationConfig(maxNewTokens = maxTokens, temperature = 0.1f)
+            val genConfig = GenerationConfig()
+            genConfig.maxTokens = maxTokens
+            genConfig.samplerConfig = SamplerConfig().apply { temperature = 0.1f }
 
-            val generateResult = llm.generate(formattedPrompt, genConfig)
+            var profile: ProfilingData? = null
+            var streamError: Throwable? = null
 
-            if (generateResult.isFailure) {
+            llm.generateStreamFlow(formattedPrompt, genConfig).collect { result ->
+                when (result) {
+                    is LlmStreamResult.Token -> {
+                        sb.append(result.text)
+                        callback?.onToken(result.text)
+                    }
+                    is LlmStreamResult.Completed -> profile = result.profile
+                    is LlmStreamResult.Error -> streamError = result.throwable
+                }
+            }
+
+            val finalProfile = profile
+            if (streamError != null || finalProfile == null) {
                 return@withContext GenieXResult(
                     modelName = modelName, computeUnit = computeUnit,
                     ttftMs = 0.0, prefillSpeed = 0.0, decodeSpeed = 0.0,
                     promptTokens = 0, generatedTokens = 0,
                     peakMemoryMb = 0.0, loadTimeMs = loadTimeMs,
-                    generatedText = "",
+                    generatedText = sb.toString(),
                     success = false,
-                    error = "Generation failed: ${generateResult.exceptionOrNull()?.message}",
+                    error = "Generation failed: ${streamError?.message ?: "no profiling data returned"}",
                 )
             }
 
-            val output = generateResult.getOrThrow()
-            val profile = output.profileData
-            val memAfter = Debug.getNativeHeapAllocatedSize()
-            val peakMemoryMb = (memAfter - memBefore).coerceAtLeast(0) / (1024.0 * 1024.0)
+            // Absolute process RSS (same measurement as the Universal/llama.cpp card).
+            // A native-heap delta misses the mmap'd GGUF and reports near-zero.
+            val peakMemoryMb = getRssMemoryMb().toDouble()
 
             GenieXResult(
                 modelName = modelName,
                 computeUnit = computeUnit,
-                ttftMs = profile.ttftMs,
-                prefillSpeed = profile.prefillSpeed,
-                decodeSpeed = profile.decodingSpeed,
-                promptTokens = profile.promptTokens,
-                generatedTokens = profile.generatedTokens,
+                ttftMs = finalProfile.ttftMs,
+                prefillSpeed = finalProfile.prefillSpeed,
+                decodeSpeed = finalProfile.decodingSpeed,
+                promptTokens = finalProfile.promptTokens,
+                generatedTokens = finalProfile.generatedTokens,
                 peakMemoryMb = peakMemoryMb,
                 loadTimeMs = loadTimeMs,
-                generatedText = output.fullText,
+                generatedText = sb.toString(),
                 success = true,
             )
         } catch (e: Exception) {
@@ -193,7 +295,7 @@ class GenieXBenchmark(private val context: Context) {
                 error = e.message,
             )
         } finally {
-            try { llm?.close() } catch (_: Exception) {}
+            // Model stays resident in RAM (reusable across runs); freed only via unload().
         }
     }
 

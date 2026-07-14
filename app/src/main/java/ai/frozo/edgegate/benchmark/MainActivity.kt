@@ -1,5 +1,6 @@
 package ai.frozo.edgegate.benchmark
 
+import android.app.ActivityManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -9,6 +10,11 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.geniex.sdk.GenieXSdk
+import com.geniex.sdk.ModelManagerWrapper
+import com.geniex.sdk.bean.HubSource
+import com.geniex.sdk.bean.ModelPullInput
+import com.geniex.sdk.bean.ModelType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -72,6 +78,37 @@ class MainActivity : AppCompatActivity(), BenchmarkEngine.ProgressCallback {
     private lateinit var cardLlmResults: LinearLayout
     private lateinit var tvLlmResults: TextView
     private var llmModelFile: File? = null
+    private lateinit var spinnerLlmDownloaded: Spinner
+    private lateinit var btnLlmLoad: Button
+    private lateinit var btnLlmUnload: Button
+    private lateinit var tvLlmLoadStatus: TextView
+    // displayName -> on-disk .gguf path, populated from GenieX's downloaded models
+    private var llmDownloadedModels: Map<String, String> = emptyMap()
+    // One shared engine so a loaded model stays resident in RAM across runs.
+    private val llmEngineLazy = lazy { LlmBenchmark(this) }
+    private val llmEngine: LlmBenchmark by llmEngineLazy
+
+    // GenieX views
+    private lateinit var spinnerGenieXModels: Spinner
+    private lateinit var tvGenieXModelStatus: TextView
+    private lateinit var btnGenieXDownload: Button
+    private lateinit var pbGenieXDownload: ProgressBar
+    private lateinit var tvGenieXDownloadStatus: TextView
+    private lateinit var spinnerGenieXComputeUnit: Spinner
+    private lateinit var btnRunGenieX: Button
+    private lateinit var tvGenieXResults: TextView
+    private lateinit var etGenieXPrompt: EditText
+    private var genieXDownloadedModels: Set<String> = emptySet()
+    private lateinit var btnGenieXLoad: Button
+    private lateinit var btnGenieXUnload: Button
+    private lateinit var tvGenieXLoadStatus: TextView
+    // One shared engine so a loaded model stays resident in RAM across runs.
+    private val geniexLazy = lazy { GenieXBenchmark(this) }
+    private val geniex: GenieXBenchmark by geniexLazy
+
+    // System RAM / Free RAM
+    private lateinit var tvSystemRam: TextView
+    private lateinit var btnFreeRam: Button
 
     // Quality gates views
     private lateinit var spinnerGatePreset: Spinner
@@ -118,11 +155,21 @@ class MainActivity : AppCompatActivity(), BenchmarkEngine.ProgressCallback {
         // LLM benchmark
         btnPickGguf.setOnClickListener { ggufPickerLauncher.launch(arrayOf("*/*")) }
         btnRunLlm.setOnClickListener { runLlmBenchmark() }
+        btnLlmLoad.setOnClickListener { loadSelectedLlmModel() }
+        btnLlmUnload.setOnClickListener { unloadLlm() }
+        updateLlmLoadStatus()
+
+        // GenieX on-device LLM
+        setupGenieX()
 
         // Quality gates setup
         setupGatePresetSpinner()
         btnAddGate.setOnClickListener { addCustomGateRow() }
         btnRemoveGate.setOnClickListener { removeLastCustomGateRow() }
+
+        // System / Free RAM
+        btnFreeRam.setOnClickListener { freeRam() }
+        updateSystemRam()
 
         // Run device compatibility analysis
         analyzeDevice()
@@ -344,6 +391,28 @@ class MainActivity : AppCompatActivity(), BenchmarkEngine.ProgressCallback {
         btnRunLlm = findViewById(R.id.btnRunLlm)
         cardLlmResults = findViewById(R.id.cardLlmResults)
         tvLlmResults = findViewById(R.id.tvLlmResults)
+        spinnerLlmDownloaded = findViewById(R.id.spinnerLlmDownloaded)
+        btnLlmLoad = findViewById(R.id.btnLlmLoad)
+        btnLlmUnload = findViewById(R.id.btnLlmUnload)
+        tvLlmLoadStatus = findViewById(R.id.tvLlmLoadStatus)
+
+        // System RAM / Free RAM
+        tvSystemRam = findViewById(R.id.tvSystemRam)
+        btnFreeRam = findViewById(R.id.btnFreeRam)
+
+        // GenieX views
+        spinnerGenieXModels = findViewById(R.id.spinnerGenieXModels)
+        tvGenieXModelStatus = findViewById(R.id.tvGenieXModelStatus)
+        btnGenieXDownload = findViewById(R.id.btnGenieXDownload)
+        pbGenieXDownload = findViewById(R.id.pbGenieXDownload)
+        tvGenieXDownloadStatus = findViewById(R.id.tvGenieXDownloadStatus)
+        spinnerGenieXComputeUnit = findViewById(R.id.spinnerGenieXComputeUnit)
+        btnRunGenieX = findViewById(R.id.btnRunGenieX)
+        tvGenieXResults = findViewById(R.id.tvGenieXResults)
+        etGenieXPrompt = findViewById(R.id.etGenieXPrompt)
+        btnGenieXLoad = findViewById(R.id.btnGenieXLoad)
+        btnGenieXUnload = findViewById(R.id.btnGenieXUnload)
+        tvGenieXLoadStatus = findViewById(R.id.tvGenieXLoadStatus)
 
         // Quality gates views
         spinnerGatePreset = findViewById(R.id.spinnerGatePreset)
@@ -598,8 +667,44 @@ class MainActivity : AppCompatActivity(), BenchmarkEngine.ProgressCallback {
         }
     }
 
+    /** The .gguf file to benchmark/load: a real downloaded GenieX model if selected, else the picked file. */
+    private fun selectedLlmModelFile(): File? {
+        val displayName = spinnerLlmDownloaded.selectedItem?.toString()
+        val downloadedPath = displayName?.let { llmDownloadedModels[it] }
+        return if (downloadedPath != null) File(downloadedPath) else llmModelFile
+    }
+
+    /** Query GenieX's downloaded models for any .gguf files and refresh the spinner. */
+    private fun refreshLlmDownloadedState() {
+        lifecycleScope.launch {
+            val map = linkedMapOf<String, String>()
+            try {
+                for (name in ModelManagerWrapper.list()) {
+                    val paths = ModelManagerWrapper.getPaths(name)
+                    val modelPath = paths?.model_path
+                    if (modelPath != null && modelPath.endsWith(".gguf", ignoreCase = true)) {
+                        map[name] = modelPath
+                    }
+                }
+            } catch (e: Exception) {
+                // leave map as whatever was collected so far
+            }
+            llmDownloadedModels = map
+
+            val items = if (map.isNotEmpty()) {
+                map.keys.toList()
+            } else {
+                listOf("No downloaded GGUF — pick a file below")
+            }
+            val adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_item, items)
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            spinnerLlmDownloaded.adapter = adapter
+            spinnerLlmDownloaded.setSelection(0)
+        }
+    }
+
     private fun runLlmBenchmark() {
-        val modelFile = llmModelFile
+        val modelFile = selectedLlmModelFile()
         if (modelFile == null) {
             Toast.makeText(this, "Pick a .gguf model first", Toast.LENGTH_SHORT).show()
             return
@@ -619,7 +724,6 @@ class MainActivity : AppCompatActivity(), BenchmarkEngine.ProgressCallback {
         btnRunLlm.isEnabled = false
         showProgress("Loading LLM...")
 
-        val llmEngine = LlmBenchmark(this)
         val config = LlmBenchmarkConfig(
             prompt = prompt,
             maxTokens = maxTokens,
@@ -667,8 +771,354 @@ class MainActivity : AppCompatActivity(), BenchmarkEngine.ProgressCallback {
             } finally {
                 hideProgress()
                 btnRunLlm.isEnabled = true
+                updateLlmLoadStatus()
+                updateSystemRam()
             }
         }
+    }
+
+    /** Load the selected model into RAM without generating, so runs are instant. */
+    private fun loadSelectedLlmModel() {
+        val modelFile = selectedLlmModelFile()
+        if (modelFile == null) {
+            Toast.makeText(this, "Pick a .gguf model first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (!LlmBenchmark.isAvailable()) {
+            Toast.makeText(this,
+                "LLM engine not available. App needs to be built with NDK (llama.cpp).",
+                Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val threads = etLlmThreads.text.toString().toIntOrNull() ?: 4
+        val config = LlmBenchmarkConfig(threads = threads)
+
+        btnLlmLoad.isEnabled = false
+        tvLlmLoadStatus.text = "Loading ${modelFile.name} into RAM..."
+        tvLlmLoadStatus.setTextColor(0xFF94a3b8.toInt())
+        lifecycleScope.launch {
+            val error = try {
+                llmEngine.load(modelFile, config)
+            } catch (e: Exception) {
+                e.message ?: "Load failed"
+            }
+            if (error != null) {
+                Toast.makeText(this@MainActivity, error, Toast.LENGTH_LONG).show()
+            }
+            updateLlmLoadStatus()
+            updateSystemRam()
+        }
+    }
+
+    /** Free the resident model's native memory so RAM drops after testing. */
+    private fun unloadLlm() {
+        llmEngine.unload()
+        Toast.makeText(this, "Model unloaded — RAM freed", Toast.LENGTH_SHORT).show()
+        updateLlmLoadStatus()
+        updateSystemRam()
+    }
+
+    private fun updateLlmLoadStatus() {
+        if (llmEngineLazy.isInitialized() && llmEngine.isLoaded()) {
+            tvLlmLoadStatus.text = "In RAM: ${llmEngine.loadedModelName()}"
+            tvLlmLoadStatus.setTextColor(0xFF10b981.toInt())
+            btnLlmLoad.isEnabled = true
+            btnLlmUnload.isEnabled = true
+        } else {
+            tvLlmLoadStatus.text = "Not loaded"
+            tvLlmLoadStatus.setTextColor(0xFF94a3b8.toInt())
+            btnLlmLoad.isEnabled = true
+            btnLlmUnload.isEnabled = false
+        }
+    }
+
+    // ========================================================================
+    // GenieX On-Device LLM
+    // ========================================================================
+
+    private fun setupGenieX() {
+        // Initialize the GenieX SDK
+        GenieXSdk.getInstance().init(this, object : GenieXSdk.InitCallback {
+            override fun onSuccess() {
+                // GenieX auto-loads its runtime plugins (llama.cpp / QAIRT) internally
+                // once the SDK's bundled native libs are present — no manual
+                // registerPlugin needed (that API is for external/custom plugins).
+                android.util.Log.i("EdgeGate", "GenieX SDK initialized")
+            }
+            override fun onFailure(msg: String) {
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "GenieX init failed: $msg", Toast.LENGTH_LONG).show()
+                }
+            }
+        })
+
+        // Populate the model spinner with catalog display names
+        val modelAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            GenieXBenchmark.MODEL_CATALOG.map { it.displayName },
+        )
+        modelAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerGenieXModels.adapter = modelAdapter
+
+        // Populate compute-unit spinner
+        val unitAdapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            GenieXBenchmark.COMPUTE_UNITS,
+        )
+        unitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinnerGenieXComputeUnit.adapter = unitAdapter
+
+        // Refresh downloaded status when the selected model changes
+        spinnerGenieXModels.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                updateGenieXModelStatus()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        btnGenieXDownload.setOnClickListener { downloadSelectedGenieXModel() }
+        btnRunGenieX.setOnClickListener { runSelectedGenieXBenchmark() }
+        btnGenieXLoad.setOnClickListener { loadSelectedGenieXModel() }
+        btnGenieXUnload.setOnClickListener { unloadGenieX() }
+
+        refreshGenieXDownloadedState()
+        updateGenieXLoadStatus()
+    }
+
+    private fun selectedGenieXModel(): GenieXBenchmark.ModelEntry {
+        val idx = spinnerGenieXModels.selectedItemPosition.coerceIn(0, GenieXBenchmark.MODEL_CATALOG.size - 1)
+        return GenieXBenchmark.MODEL_CATALOG[idx]
+    }
+
+    /** Query GenieX for already-downloaded models and refresh the status label. */
+    private fun refreshGenieXDownloadedState() {
+        lifecycleScope.launch {
+            try {
+                val downloaded = ModelManagerWrapper.list()
+                genieXDownloadedModels = downloaded.toSet()
+            } catch (e: Exception) {
+                genieXDownloadedModels = emptySet()
+            }
+            updateGenieXModelStatus()
+            // GenieX GGUF downloads also feed the Universal LLM card's spinner.
+            refreshLlmDownloadedState()
+        }
+    }
+
+    private fun isGenieXModelDownloaded(model: GenieXBenchmark.ModelEntry): Boolean {
+        return genieXDownloadedModels.any {
+            it.equals(model.modelId, ignoreCase = true) || it.equals(model.displayName, ignoreCase = true)
+        }
+    }
+
+    private fun updateGenieXModelStatus() {
+        val model = selectedGenieXModel()
+        if (isGenieXModelDownloaded(model)) {
+            tvGenieXModelStatus.text = "Ready ✓"
+            tvGenieXModelStatus.setTextColor(0xFF10b981.toInt())
+            btnGenieXDownload.isEnabled = false
+        } else {
+            tvGenieXModelStatus.text = "Not downloaded"
+            tvGenieXModelStatus.setTextColor(0xFF56697d.toInt())
+            btnGenieXDownload.isEnabled = true
+        }
+    }
+
+    private fun downloadSelectedGenieXModel() {
+        val model = selectedGenieXModel()
+
+        btnGenieXDownload.isEnabled = false
+        pbGenieXDownload.visibility = View.VISIBLE
+        pbGenieXDownload.progress = 0
+        tvGenieXDownloadStatus.visibility = View.VISIBLE
+        tvGenieXDownloadStatus.text = "Preparing download..."
+
+        lifecycleScope.launch {
+            try {
+                val chipset = ModelManagerWrapper.detectChipset()
+                val input = ModelPullInput(
+                    model.modelId,   // model_name
+                    "Q4_0",          // precision — NPU-capable quant (Q8_0 can't offload to Hexagon and yields garbage)
+                    HubSource.AUTO,  // hub
+                    "",              // local_path
+                    "",              // hf_token
+                    chipset,         // chipset
+                    model.displayName, // display_name
+                    ModelType.LLM,   // model_type
+                )
+
+                ModelManagerWrapper.pullFlow(input).collect { event ->
+                    when (event) {
+                        is ModelManagerWrapper.PullEvent.Progress -> {
+                            val totalBytes = event.files.sumOf { it.total_bytes }
+                            val downloadedBytes = event.files.sumOf { it.downloaded_bytes }
+                            val percent = if (totalBytes > 0) {
+                                (downloadedBytes * 100 / totalBytes).toInt()
+                            } else 0
+                            pbGenieXDownload.progress = percent
+                            tvGenieXDownloadStatus.text = "Downloading ${model.displayName}... $percent%"
+                        }
+                        is ModelManagerWrapper.PullEvent.Completed -> {
+                            pbGenieXDownload.progress = 100
+                            pbGenieXDownload.visibility = View.GONE
+                            tvGenieXDownloadStatus.text = "Downloaded ✓"
+                            refreshGenieXDownloadedState()
+                        }
+                        is ModelManagerWrapper.PullEvent.Error -> {
+                            pbGenieXDownload.visibility = View.GONE
+                            tvGenieXDownloadStatus.text = "Error ${event.code}: ${event.message}"
+                            btnGenieXDownload.isEnabled = true
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                pbGenieXDownload.visibility = View.GONE
+                tvGenieXDownloadStatus.text = "Download failed: ${e.message}"
+                btnGenieXDownload.isEnabled = true
+            }
+        }
+    }
+
+    private fun runSelectedGenieXBenchmark() {
+        val model = selectedGenieXModel()
+        val computeUnit = spinnerGenieXComputeUnit.selectedItem?.toString() ?: "npu"
+
+        btnRunGenieX.isEnabled = false
+        showProgress("Loading ${model.displayName} on ${computeUnit.uppercase()}...")
+
+        lifecycleScope.launch {
+            try {
+                val result = geniex.benchmark(
+                    modelId = model.modelId,
+                    computeUnit = computeUnit,
+                    prompt = etGenieXPrompt.text?.toString()?.takeIf { it.isNotBlank() }
+                        ?: "Explain edge AI in one sentence.",
+                    // Match the Universal card's max-tokens and threads for a fair comparison.
+                    maxTokens = etMaxTokens.text.toString().toIntOrNull() ?: 64,
+                    threads = etLlmThreads.text.toString().toIntOrNull() ?: 4,
+                    callback = object : GenieXBenchmark.ProgressCallback {
+                        override fun onProgress(status: String) {
+                            runOnUiThread { showStatus(status) }
+                        }
+                        override fun onModelDownloading(model: String, progress: Int) {
+                            runOnUiThread {
+                                pbGenieXDownload.visibility = View.VISIBLE
+                                pbGenieXDownload.progress = progress
+                                tvGenieXDownloadStatus.visibility = View.VISIBLE
+                                tvGenieXDownloadStatus.text = "Downloading $model... $progress%"
+                            }
+                        }
+                        override fun onToken(token: String) {}
+                    },
+                )
+
+                pbGenieXDownload.visibility = View.GONE
+                tvGenieXResults.text = geniex.formatResult(result)
+                refreshGenieXDownloadedState()
+            } catch (e: Exception) {
+                tvGenieXResults.text = "GenieX benchmark failed: ${e.message}"
+            } finally {
+                hideProgress()
+                btnRunGenieX.isEnabled = true
+                updateGenieXLoadStatus()
+            }
+        }
+    }
+
+    /** Load the selected model into RAM without generating, so runs are instant. */
+    private fun loadSelectedGenieXModel() {
+        val model = selectedGenieXModel()
+        val computeUnit = spinnerGenieXComputeUnit.selectedItem?.toString() ?: "npu"
+        btnGenieXLoad.isEnabled = false
+        tvGenieXLoadStatus.text = "Loading ${model.displayName} into RAM..."
+        tvGenieXLoadStatus.setTextColor(0xFF94a3b8.toInt())
+        val threads = etLlmThreads.text.toString().toIntOrNull() ?: 4
+        lifecycleScope.launch {
+            val error = try {
+                geniex.load(model.modelId, computeUnit, threads)
+            } catch (e: Exception) {
+                e.message ?: "Load failed"
+            }
+            if (error != null) {
+                Toast.makeText(this@MainActivity, error, Toast.LENGTH_LONG).show()
+            }
+            updateGenieXLoadStatus()
+        }
+    }
+
+    /** Free the resident model's native memory so RAM drops after testing. */
+    private fun unloadGenieX() {
+        geniex.unload()
+        Toast.makeText(this, "Model unloaded — RAM freed", Toast.LENGTH_SHORT).show()
+        updateGenieXLoadStatus()
+    }
+
+    private fun updateGenieXLoadStatus() {
+        if (geniexLazy.isInitialized() && geniex.isLoaded()) {
+            tvGenieXLoadStatus.text = "In RAM: ${geniex.loadedModelName()}"
+            tvGenieXLoadStatus.setTextColor(0xFF10b981.toInt())
+            btnGenieXLoad.isEnabled = true
+            btnGenieXUnload.isEnabled = true
+        } else {
+            tvGenieXLoadStatus.text = "Not loaded"
+            tvGenieXLoadStatus.setTextColor(0xFF94a3b8.toInt())
+            btnGenieXLoad.isEnabled = true
+            btnGenieXUnload.isEnabled = false
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Release native model memory when the screen goes away.
+        if (geniexLazy.isInitialized()) geniex.unload()
+        if (llmEngineLazy.isInitialized()) llmEngine.unload()
+    }
+
+    // ========================================================================
+    // System RAM / Free RAM
+    // ========================================================================
+
+    private fun availMemMb(): Long {
+        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        val info = ActivityManager.MemoryInfo()
+        am.getMemoryInfo(info)
+        return info.availMem / (1024 * 1024)
+    }
+
+    private fun updateSystemRam() {
+        val am = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+        val info = ActivityManager.MemoryInfo()
+        am.getMemoryInfo(info)
+        val freeGb = info.availMem / (1024.0 * 1024.0 * 1024.0)
+        val totalGb = info.totalMem / (1024.0 * 1024.0 * 1024.0)
+        runOnUiThread {
+            tvSystemRam.text = "RAM: ${"%.1f".format(freeGb)} GB free / ${"%.1f".format(totalGb)} GB total"
+        }
+    }
+
+    /**
+     * Free RAM held by EdgeGate's own resident models. Android has no API to close
+     * OTHER apps' memory (killBackgroundProcesses only kills the caller's own
+     * background services and is not a real memory-freeing mechanism), so this only
+     * unloads models EdgeGate itself is holding resident, then nudges the GC.
+     */
+    private fun freeRam() {
+        val before = availMemMb()
+        if (geniexLazy.isInitialized()) geniex.unload()
+        if (llmEngineLazy.isInitialized()) llmEngine.unload()
+        Runtime.getRuntime().gc()
+
+        updateSystemRam()
+        updateGenieXLoadStatus()
+        updateLlmLoadStatus()
+
+        val after = availMemMb()
+        val delta = after - before
+        val deltaText = if (delta > 0) "${delta} MB freed" else "no measurable change"
+        Toast.makeText(this, "$deltaText — close other apps for more", Toast.LENGTH_LONG).show()
     }
 
     // ========================================================================
