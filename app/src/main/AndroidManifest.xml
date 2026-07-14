@@ -5,6 +5,7 @@
 
     <application
         android:allowBackup="false"
+        android:extractNativeLibs="true"
         android:icon="@android:drawable/ic_menu_compass"
         android:label="EdgeGate Benchmark"
         android:theme="@style/Theme.EdgeGate"

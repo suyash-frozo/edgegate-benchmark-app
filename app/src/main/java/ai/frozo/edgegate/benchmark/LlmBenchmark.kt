@@ -82,6 +82,54 @@ class LlmBenchmark(private val context: Context) {
     private external fun nativeUnloadModel(modelPtr: Long)
     private external fun nativeGetSystemInfo(): String
 
+    // ---- Model residency: load / unload from RAM ----
+    // llama.cpp pins the model in native memory until nativeUnloadModel() is called.
+    // We keep it resident so it can be reused across runs, and free it on demand so
+    // RAM drops after testing (mirrors GenieXBenchmark's load/unload pattern).
+    private var loadedPtr: Long = 0L
+    private var loadedKey: String? = null
+    private var loadedName: String? = null
+
+    /** True if a model is currently held in RAM. */
+    fun isLoaded(): Boolean = loadedPtr != 0L
+
+    /** Display name of the resident model, or null if nothing is loaded. */
+    fun loadedModelName(): String? = loadedName
+
+    /** Free the resident model's native memory. Safe to call when nothing is loaded. */
+    fun unload() {
+        if (loadedPtr != 0L) {
+            try { nativeUnloadModel(loadedPtr) } catch (_: Exception) {}
+        }
+        loadedPtr = 0L
+        loadedKey = null
+        loadedName = null
+    }
+
+    /**
+     * Load a model into RAM (without generating), or reuse it if already resident.
+     * Loading a different model/config frees the previous one first.
+     * Returns null on success, or a human-readable error message on failure.
+     */
+    suspend fun load(modelFile: File, config: LlmBenchmarkConfig): String? = withContext(Dispatchers.Default) {
+        val key = "${modelFile.absolutePath}|${config.threads}|${config.gpuLayers}"
+        if (loadedPtr != 0L && loadedKey == key) return@withContext null
+        unload()  // free any other model before loading a new one
+
+        if (!isAvailable()) {
+            return@withContext "llama.cpp native library not available. Rebuild with NDK."
+        }
+
+        val ptr = nativeLoadModel(modelFile.absolutePath, config.threads, config.gpuLayers)
+        if (ptr == 0L) {
+            return@withContext "Failed to load model"
+        }
+        loadedPtr = ptr
+        loadedKey = key
+        loadedName = modelFile.name
+        null
+    }
+
     /**
      * Run LLM benchmark on a GGUF model file.
      *
@@ -93,39 +141,21 @@ class LlmBenchmark(private val context: Context) {
         callback: ProgressCallback? = null,
     ): LlmResult = withContext(Dispatchers.Default) {
 
-        if (!isAvailable()) {
-            return@withContext LlmResult(
-                modelName = modelFile.name,
-                prompt = config.prompt,
-                generatedText = "",
-                totalTokens = 0,
-                promptTokens = 0,
-                generationTokens = 0,
-                ttftMs = 0f,
-                tokensPerSecond = 0f,
-                totalTimeMs = 0f,
-                promptEvalTimeMs = 0f,
-                generationTimeMs = 0f,
-                peakMemoryMb = 0f,
-                modelSizeBytes = modelFile.length(),
-                success = false,
-                error = "llama.cpp native library not available. Rebuild with NDK.",
-            )
-        }
-
         callback?.onProgress("Loading model: ${modelFile.name}...")
 
-        var modelPtr = 0L
         try {
-            // Load model
+            // Load (or reuse the already-resident) model. The model stays resident
+            // afterwards and is freed only via unload().
             val loadStart = System.nanoTime()
-            modelPtr = nativeLoadModel(modelFile.absolutePath, config.threads, config.gpuLayers)
+            val loadError = load(modelFile, config)
             val loadTimeMs = (System.nanoTime() - loadStart) / 1_000_000f
+
+            if (loadError != null) {
+                return@withContext buildFailResult(modelFile, config, loadError)
+            }
             callback?.onProgress("Model loaded in ${"%.1f".format(loadTimeMs)} ms")
 
-            if (modelPtr == 0L) {
-                return@withContext buildFailResult(modelFile, config, "Failed to load model")
-            }
+            val modelPtr = loadedPtr
 
             // Warmup
             if (config.warmupRuns > 0) {
@@ -167,11 +197,8 @@ class LlmBenchmark(private val context: Context) {
 
         } catch (e: Exception) {
             return@withContext buildFailResult(modelFile, config, "${e.javaClass.simpleName}: ${e.message}")
-        } finally {
-            if (modelPtr != 0L) {
-                try { nativeUnloadModel(modelPtr) } catch (_: Exception) {}
-            }
         }
+        // Model stays resident in RAM (reusable across runs); freed only via unload().
     }
 
     private fun parseNativeResult(
